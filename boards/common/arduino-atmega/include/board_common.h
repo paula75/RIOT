@@ -37,7 +37,7 @@ extern "C" {
  * baudrate to 9600 for this board
  * @{
  */
-#define UART_STDIO_BAUDRATE (9600U)
+#define STDIO_UART_BAUDRATE (9600U)
 /** @} */
 
 /**
@@ -58,32 +58,6 @@ extern "C" {
 #define LED0_OFF            (PORTB &= ~LED0_MASK)
 #define LED0_TOGGLE         (PORTB ^=  LED0_MASK)
 /** @} */
-
-/**
- * @brief   Context swap defines
- *
- * Setup to use PC5 which is pin change interrupt 13 (PCINT13)
- * This emulates a software triggered interrupt
- */
-#ifdef CPU_ATMEGA328P
-#define AVR_CONTEXT_SWAP_INIT do { \
-            DDRD |= (1 << PD7); \
-            PCICR |= (1 << PCIE2); \
-            PCMSK2 |= (1 << PCINT23); \
-} while (0)
-#define AVR_CONTEXT_SWAP_INTERRUPT_VECT  PCINT2_vect
-#define AVR_CONTEXT_SWAP_TRIGGER   PORTD ^= (1 << PD7)
-#endif
-
-#ifdef CPU_ATMEGA2560
-#define AVR_CONTEXT_SWAP_INIT do { \
-    DDRJ |= (1 << PJ6); \
-    PCICR |= (1 << PCIE1); \
-    PCMSK1 |= (1 << PCINT15); \
-} while (0)
-#define AVR_CONTEXT_SWAP_INTERRUPT_VECT  PCINT1_vect
-#define AVR_CONTEXT_SWAP_TRIGGER   PORTJ ^= (1 << PJ6)
-#endif
 
 /**
  * @name    xtimer configuration values

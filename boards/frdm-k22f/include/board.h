@@ -7,9 +7,7 @@
  */
 
 /**
- * @defgroup    boards_frdm-k22f NXP FRDM-K22F Board
- * @ingroup     boards
- * @brief       Support for the NXP FRDM-K22F
+ * @ingroup     boards_frdm-k22f
  * @{
  *
  * @file
@@ -52,6 +50,14 @@ extern "C"
 #define LED2_ON            (GPIOD->PCOR = LED2_MASK)
 #define LED2_OFF           (GPIOD->PSOR = LED2_MASK)
 #define LED2_TOGGLE        (GPIOD->PTOR = LED2_MASK)
+/** @} */
+
+/**
+ * @name    FXOS8700CQ 3-axis accelerometer and magnetometer bus configuration
+ * @{
+ */
+#define FXOS8700_PARAM_I2C          I2C_DEV(0)
+#define FXOS8700_PARAM_ADDR         0x1C
 /** @} */
 
 /**

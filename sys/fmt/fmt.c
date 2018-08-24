@@ -83,6 +83,15 @@ size_t fmt_strlen(const char *str)
     return (tmp - str);
 }
 
+size_t fmt_strnlen(const char *str, size_t maxlen)
+{
+    const char *tmp = str;
+    while(*tmp && maxlen--) {
+        tmp++;
+    }
+    return (tmp - str);
+}
+
 size_t fmt_str(char *out, const char *str)
 {
     int len = 0;
@@ -123,18 +132,22 @@ static uint8_t _hex_nib(uint8_t nib)
     return _byte_mod25((nib & 0x1f) + 9);
 }
 
+uint8_t fmt_hex_byte(const char *hex)
+{
+    return (_hex_nib(hex[0]) << 4) | _hex_nib(hex[1]);
+}
+
 size_t fmt_hex_bytes(uint8_t *out, const char *hex)
 {
     size_t len = fmt_strlen(hex);
 
     if (len & 1) {
-        out = NULL;
         return 0;
     }
 
     size_t final_len = len >> 1;
     for (size_t i = 0, j = 0; j < final_len; i += 2, j++) {
-        out[j] = (_hex_nib(hex[i]) << 4) | _hex_nib(hex[i+1]);
+        out[j] = fmt_hex_byte(hex + i);
     }
 
     return final_len;
@@ -263,48 +276,56 @@ size_t fmt_s16_dec(char *out, int16_t val)
     return fmt_s32_dec(out, val);
 }
 
-size_t fmt_s16_dfp(char *out, int16_t val, unsigned fp_digits)
+size_t fmt_s16_dfp(char *out, int16_t val, int fp_digits)
 {
     return fmt_s32_dfp(out, val, fp_digits);
 }
 
-size_t fmt_s32_dfp(char *out, int32_t val, unsigned fp_digits)
+size_t fmt_s32_dfp(char *out, int32_t val, int fp_digits)
 {
-    assert(fp_digits < TENMAP_SIZE);
+    assert(fp_digits > -(int)TENMAP_SIZE);
 
-    int32_t absolute, divider;
-    unsigned div_len, len, pos = 0;
-    char tmp[9];
+    unsigned  pos = 0;
 
     if (fp_digits == 0) {
-        return fmt_s32_dec(out, val);
+        pos = fmt_s32_dec(out, val);
     }
-    if (val < 0) {
+    else if (fp_digits > 0) {
+        pos = fmt_s32_dec(out, val);
         if (out) {
-            out[pos++] = '-';
+            memset(&out[pos], '0', fp_digits);
         }
-        val = -val;
+        pos += fp_digits;
     }
+    else {
+        fp_digits *= -1;
+        uint32_t e = _tenmap[fp_digits];
+        int32_t abs = (val / (int32_t)e);
+        int32_t div = val - (abs * e);
 
-    uint32_t e = _tenmap[fp_digits];
-    absolute = (val / e);
-    divider = val - (absolute * e);
+        /* the divisor should never be negative */
+        if (div < 0) {
+            div *= -1;
+        }
+        /* handle special case for negative number with zero as absolute value */
+        if ((abs == 0) && (val < 0)) {
+            if (out) {
+                out[pos] = '-';
+            }
+            pos++;
+        }
 
-    pos += fmt_s32_dec(&out[pos], absolute);
-
-    if (!out) {
-        return pos + 1 + fp_digits;     /* abs len + decimal point + divider */
-    }
-
-    out[pos++] = '.';
-    len = pos + fp_digits;
-    div_len = fmt_s32_dec(tmp, divider);
-
-    while (pos < (len - div_len)) {
-        out[pos++] = '0';
-    }
-    for (size_t i = 0; i < div_len; i++) {
-        out[pos++] = tmp[i];
+        if (!out) {
+            /* compensate for the decimal point character... */
+            pos += fmt_s32_dec(NULL, abs) + 1;
+        }
+        else {
+            pos += fmt_s32_dec(&out[pos], abs);
+            out[pos++] = '.';
+            unsigned div_len = fmt_s32_dec(&out[pos], div);
+            fmt_lpad(&out[pos], div_len, (size_t)fp_digits, '0');
+        }
+        pos += fp_digits;
     }
 
     return pos;

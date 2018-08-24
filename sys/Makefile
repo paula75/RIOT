@@ -103,6 +103,9 @@ endif
 ifneq (,$(filter gcoap,$(USEMODULE)))
   DIRS += net/application_layer/gcoap
 endif
+ifneq (,$(filter asymcute,$(USEMODULE)))
+  DIRS += net/application_layer/asymcute
+endif
 ifneq (,$(filter emcute,$(USEMODULE)))
   DIRS += net/application_layer/emcute
 endif
@@ -124,7 +127,16 @@ endif
 ifneq (,$(filter nanocoap,$(USEMODULE)))
   DIRS += net/application_layer/nanocoap
 endif
+ifneq (,$(filter skald,$(USEMODULE)))
+  DIRS += net/skald
+endif
+ifneq (,$(filter rdcli_common,$(USEMODULE)))
+  DIRS += net/application_layer/rdcli_common
+endif
+ifneq (,$(filter rdcli_simple,$(USEMODULE)))
+    DIRS += net/application_layer/rdcli_simple
+endif
 
-DIRS += $(dir $(wildcard $(addsuffix /Makefile, ${USEMODULE})))
+DIRS += $(dir $(wildcard $(addsuffix /Makefile, $(USEMODULE))))
 
 include $(RIOTBASE)/Makefile.base

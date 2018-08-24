@@ -34,7 +34,6 @@
 #define ENABLE_DEBUG        (0)
 #include "debug.h"
 
-
 #define SPI_CONF            SPI_MODE_0
 #define RMSR_DEFAULT_VALUE  (0x55)
 
@@ -194,7 +193,7 @@ static uint16_t tx_upload(w5100_t *dev, uint16_t start, void *data, size_t len)
     }
 }
 
-static int send(netdev_t *netdev, const struct iovec *vector, unsigned count)
+static int send(netdev_t *netdev, const iolist_t *iolist)
 {
     w5100_t *dev = (w5100_t *)netdev;
     int sum = 0;
@@ -210,9 +209,10 @@ static int send(netdev_t *netdev, const struct iovec *vector, unsigned count)
         pos = S0_TX_BASE;
     }
 
-    for (unsigned i = 0; i < count; i++) {
-        pos = tx_upload(dev, pos, vector[i].iov_base, vector[i].iov_len);
-        sum += vector[i].iov_len;
+    for (const iolist_t *iol = iolist; iol; iol = iol->iol_next) {
+        size_t len = iol->iol_len;
+        pos = tx_upload(dev, pos, iol->iol_base, len);
+        sum += len;
     }
 
     waddr(dev, S0_TX_WR0, S0_TX_WR1, pos);
@@ -284,14 +284,21 @@ static void isr(netdev_t *netdev)
     uint8_t ir;
     w5100_t *dev = (w5100_t *)netdev;
 
-    /* we only react on RX events, and if we see one, we read from the RX buffer
-     * until it is empty */
+    /* read interrupt register */
     spi_acquire(dev->p.spi, dev->p.cs, SPI_CONF, dev->p.clk);
     ir = rreg(dev, S0_IR);
     spi_release(dev->p.spi);
+
+    /* we only react on RX events, and if we see one, we read from the RX buffer
+     * until it is empty */
     while (ir & IR_RECV) {
         DEBUG("[w5100] netdev RX complete\n");
         netdev->event_callback(netdev, NETDEV_EVENT_RX_COMPLETE);
+
+        /* reread interrupt register */
+        spi_acquire(dev->p.spi, dev->p.cs, SPI_CONF, dev->p.clk);
+        ir = rreg(dev, S0_IR);
+        spi_release(dev->p.spi);
     }
 }
 

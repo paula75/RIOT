@@ -7,7 +7,7 @@
  */
 
 /**
- * @ingroup     driver_sensif
+ * @ingroup     sys_phydat
  * @{
  *
  * @file
@@ -49,17 +49,22 @@ void phydat_dump(phydat_t *data, uint8_t dim)
                 scale_prefix = phydat_prefix_from_scale(data->scale);
         }
 
-        printf("\t[%i] ", (int)i);
-
+        printf("\t");
+        if (dim > 1) {
+            printf("[%u] ", (unsigned int)i);
+        }
+        else {
+            printf("     ");
+        }
         if (scale_prefix) {
-            printf("%i%c", (int)data->val[i], scale_prefix);
+            printf("%6d %c", (int)data->val[i], scale_prefix);
         }
         else if (data->scale == 0) {
-            printf("%i", (int)data->val[i]);
+            printf("%6d", (int)data->val[i]);
         }
         else if ((data->scale > -5) && (data->scale < 0)) {
             char num[8];
-            size_t len = fmt_s16_dfp(num, data->val[i], data->scale * -1);
+            size_t len = fmt_s16_dfp(num, data->val[i], data->scale);
             num[len] = '\0';
             printf("%s", num);
         }
@@ -90,6 +95,7 @@ const char *phydat_unit_to_str(uint8_t unit)
         case UNIT_BAR:      return "Bar";
         case UNIT_PA:       return "Pa";
         case UNIT_PPM:      return "ppm";
+        case UNIT_PPB:      return "ppb";
         case UNIT_CD:       return "cd";
         case UNIT_PERCENT:  return "%";
         default:            return "";

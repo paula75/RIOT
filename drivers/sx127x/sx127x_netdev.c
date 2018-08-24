@@ -34,7 +34,6 @@
 #include "debug.h"
 
 /* Internal helper functions */
-static uint8_t _get_tx_len(const struct iovec *vector, unsigned count);
 static int _set_state(sx127x_t *dev, netopt_state_t state);
 static int _get_state(sx127x_t *dev, void *val);
 void _on_dio0_irq(void *arg);
@@ -42,35 +41,18 @@ void _on_dio1_irq(void *arg);
 void _on_dio2_irq(void *arg);
 void _on_dio3_irq(void *arg);
 
-/* Netdev driver api functions */
-static int _send(netdev_t *netdev, const struct iovec *vector, unsigned count);
-static int _recv(netdev_t *netdev, void *buf, size_t len, void *info);
-static int _init(netdev_t *netdev);
-static void _isr(netdev_t *netdev);
-static int _get(netdev_t *netdev, netopt_t opt, void *val, size_t max_len);
-static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len);
-
-const netdev_driver_t sx127x_driver = {
-    .send = _send,
-    .recv = _recv,
-    .init = _init,
-    .isr = _isr,
-    .get = _get,
-    .set = _set,
-};
-
-static int _send(netdev_t *netdev, const struct iovec *vector, unsigned count)
+static int _send(netdev_t *netdev, const iolist_t *iolist)
 {
     sx127x_t *dev = (sx127x_t*) netdev;
 
     if (sx127x_get_state(dev) == SX127X_RF_TX_RUNNING) {
-        DEBUG("[WARNING] Cannot send packet: radio already in transmitting "
+        DEBUG("[sx127x] Cannot send packet: radio already in transmitting "
               "state.\n");
         return -ENOTSUP;
     }
 
-    uint8_t size;
-    size = _get_tx_len(vector, count);
+    uint8_t size = iolist_size(iolist);
+
     switch (dev->settings.modem) {
         case SX127X_MODEM_FSK:
             /* todo */
@@ -91,8 +73,8 @@ static int _send(netdev_t *netdev, const struct iovec *vector, unsigned count)
             }
 
             /* Write payload buffer */
-            for (size_t i = 0; i < count; i++) {
-                sx127x_write_fifo(dev, vector[i].iov_base, vector[i].iov_len);
+            for (const iolist_t *iol = iolist; iol; iol = iol->iol_next) {
+                sx127x_write_fifo(dev, iol->iol_base, iol->iol_len);
             }
             break;
         default:
@@ -238,14 +220,17 @@ static int _init(netdev_t *netdev)
     sx127x->settings = settings;
 
     /* Launch initialization of driver and device */
-    DEBUG("init_radio: initializing driver...\n");
-    sx127x_init(sx127x);
+    DEBUG("[sx127x] netdev: initializing driver...\n");
+    if (sx127x_init(sx127x) != SX127X_INIT_OK) {
+        DEBUG("[sx127x] netdev: initialization failed\n");
+        return -1;
+    }
 
     sx127x_init_radio_settings(sx127x);
     /* Put chip into sleep */
     sx127x_set_sleep(sx127x);
 
-    DEBUG("init_radio: sx127x initialization done\n");
+    DEBUG("[sx127x] netdev: initialization done\n");
 
     return 0;
 }
@@ -489,17 +474,6 @@ static int _set(netdev_t *netdev, netopt_t opt, const void *val, size_t len)
     return res;
 }
 
-static uint8_t _get_tx_len(const struct iovec *vector, unsigned count)
-{
-    uint8_t len = 0;
-
-    for (unsigned i = 0 ; i < count ; i++) {
-        len += vector[i].iov_len;
-    }
-
-    return len;
-}
-
 static int _set_state(sx127x_t *dev, netopt_state_t state)
 {
     switch (state) {
@@ -555,7 +529,15 @@ static int _get_state(sx127x_t *dev, void *val)
 
         case SX127X_RF_OPMODE_RECEIVER:
         case SX127X_RF_LORA_OPMODE_RECEIVER_SINGLE:
-            state = NETOPT_STATE_IDLE;
+            /* Sx127x is in receive mode:
+             * -> need to check if the device is currently receiving a packet */
+            if (sx127x_reg_read(dev, SX127X_REG_LR_MODEMSTAT) &
+                SX127X_RF_LORA_MODEMSTAT_MODEM_STATUS_SIGNAL_DETECTED) {
+                state = NETOPT_STATE_RX;
+            }
+            else {
+                state = NETOPT_STATE_IDLE;
+            }
             break;
 
         default:
@@ -590,10 +572,11 @@ void _on_dio0_irq(void *arg)
             }
             break;
         case SX127X_RF_IDLE:
-            printf("sx127x_on_dio0: IDLE state\n");
+            DEBUG("[sx127x] netdev: sx127x_on_dio0: IDLE state\n");
             break;
         default:
-            printf("sx127x_on_dio0: Unknown state [%d]\n", dev->settings.state);
+            DEBUG("[sx127x] netdev: sx127x_on_dio0: unknown state [%d]\n",
+                  dev->settings.state);
             break;
     }
 }
@@ -633,7 +616,7 @@ void _on_dio1_irq(void *arg)
             }
             break;
         default:
-            puts("sx127x_on_dio1: Unknown state");
+            puts("[sx127x] netdev: sx127x_on_dio1: unknown state");
             break;
     }
 }
@@ -686,7 +669,7 @@ void _on_dio2_irq(void *arg)
             }
             break;
         default:
-            puts("sx127x_on_dio2: Unknown state");
+            puts("[sx127x] netdev: sx127x_on_dio2: unknown state");
             break;
     }
 }
@@ -713,7 +696,16 @@ void _on_dio3_irq(void *arg)
             netdev->event_callback(netdev, NETDEV_EVENT_CAD_DONE);
             break;
         default:
-            puts("sx127x_on_dio3: Unknown modem");
+            puts("[sx127x] netdev: sx127x_on_dio3: unknown modem");
             break;
     }
 }
+
+const netdev_driver_t sx127x_driver = {
+    .send = _send,
+    .recv = _recv,
+    .init = _init,
+    .isr = _isr,
+    .get = _get,
+    .set = _set,
+};

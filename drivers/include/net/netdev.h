@@ -10,7 +10,7 @@
  */
 
 /**
- * @defgroup    drivers_netdev_api Network Device Driver API
+ * @defgroup    drivers_netdev_api Netdev - Network Device Driver API
  * @ingroup     drivers_netdev
  * @brief       This is a generic low-level network driver interface
  * @{
@@ -195,8 +195,8 @@ extern "C" {
 #endif
 
 #include <stdint.h>
-#include <sys/uio.h>
 
+#include "iolist.h"
 #include "net/netopt.h"
 
 #ifdef MODULE_NETSTATS_L2
@@ -276,6 +276,9 @@ struct netdev {
     const struct netdev_driver *driver;     /**< ptr to that driver's interface. */
     netdev_event_cb_t event_callback;       /**< callback for device events */
     void* context;                          /**< ptr to network stack context */
+#ifdef MODULE_NETDEV_LAYER
+    netdev_t *lower;                        /**< ptr to the lower netdev layer */
+#endif
 #ifdef MODULE_NETSTATS_L2
     netstats_t stats;                       /**< transceiver's statistics */
 #endif
@@ -294,17 +297,14 @@ typedef struct netdev_driver {
     /**
      * @brief Send frame
      *
-     * @pre `(dev != NULL)`
-     * @pre `(count == 0) || (vector != NULL)`
-     *      (`(count != 0) => (vector != NULL)`)
+     * @pre `(dev != NULL) && (iolist != NULL`
      *
      * @param[in] dev       network device descriptor
-     * @param[in] vector    io vector array to send
-     * @param[in] count     nr of entries in vector
+     * @param[in] iolist    io vector list to send
      *
      * @return number of bytes sent, or `< 0` on error
      */
-    int (*send)(netdev_t *dev, const struct iovec *vector, unsigned count);
+    int (*send)(netdev_t *dev, const iolist_t *iolist);
 
     /**
      * @brief Get a received frame

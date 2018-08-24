@@ -1,6 +1,6 @@
 PKG_NAME=jerryscript
 PKG_URL=https://github.com/jerryscript-project/jerryscript.git
-PKG_VERSION=bd574956e3702bc5b0512ad835b1df896cf00626
+PKG_VERSION=6e94414f9c3ad9b77c4635a0ca9e796752a205f0
 PKG_LICENSE=Apache-2.0
 
 .PHONY: all

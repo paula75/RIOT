@@ -7,10 +7,12 @@
  */
 
 /**
+ * @ingroup     tests
  * @{
  *
  * @file
  * @author  Martine Lenders <mlenders@inf.fu-berlin.de>
+ * @}
  */
 
 
@@ -141,16 +143,16 @@ static int _netdev_recv(netdev_t *dev, char *buf, int len, void *info)
     return res;
 }
 
-static int _netdev_send(netdev_t *dev, const struct iovec *vector, int count)
+static int _netdev_send(netdev_t *dev, const iolist_t *iolist)
 {
     msg_t done = { .type = _SEND_DONE };
     unsigned offset = 0;
 
     (void)dev;
     mutex_lock(&_netdev_buffer_mutex);
-    for (int i = 0; i < count; i++) {
-        memcpy(&_netdev_buffer[offset], vector[i].iov_base, vector[i].iov_len);
-        offset += vector[i].iov_len;
+    for (; iolist; iolist = iolist->iol_next) {
+        memcpy(&_netdev_buffer[offset], iolist->iol_base, iolist->iol_len);
+        offset += iolist->iol_len;
         if (offset > sizeof(_netdev_buffer)) {
             mutex_unlock(&_netdev_buffer_mutex);
             return -ENOBUFS;
@@ -319,7 +321,7 @@ bool _check_4packet(uint32_t src, uint32_t dst, uint8_t proto,
                     void *data, size_t data_len, uint16_t netif)
 {
 #if LWIP_IPV4
-    msg_t msg;
+    msg_t msg = { .content = { .value = 0 } };
 
     (void)netif;
     while (data_len != (msg.content.value - sizeof(struct ip_hdr))) {
@@ -347,7 +349,7 @@ bool _check_6packet(const ipv6_addr_t *src, const ipv6_addr_t *dst,
                     uint8_t proto, void *data, size_t data_len, uint16_t netif)
 {
 #if LWIP_IPV6
-    msg_t msg;
+    msg_t msg = { .content = { .value = 0 } };
 
     (void)netif;
     while (data_len != (msg.content.value - sizeof(ipv6_hdr_t))) {
@@ -369,5 +371,3 @@ bool _check_6packet(const ipv6_addr_t *src, const ipv6_addr_t *dst,
     return false;
 #endif
 }
-
-/** @} */

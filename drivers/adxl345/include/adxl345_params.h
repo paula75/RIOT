@@ -57,10 +57,15 @@ extern "C" {
 #define ADXL345_PARAM_SCALE_FACTOR  (3.9)
 #endif
 #ifndef ADXL345_PARAMS
-#define ADXL345_PARAMS              { .offset = ADXL345_PARAM_OFFSET,    \
+#define ADXL345_PARAMS              { .i2c    = ADXL345_PARAM_I2C,       \
+                                      .addr   = ADXL345_PARAM_ADDR,      \
+                                      .offset = ADXL345_PARAM_OFFSET,    \
                                       .range  = ADXL345_PARAM_RANGE,     \
                                       .rate   = ADXL345_PARAM_RATE,      \
                                       .full_res = ADXL345_PARAM_FULL_RES }
+#endif
+#ifndef ADXL345_SAUL_INFO
+#define ADXL345_SAUL_INFO           { .name = "adxl345" }
 #endif
 /**@}*/
 
@@ -77,9 +82,7 @@ static const adxl345_params_t adxl345_params[] =
  */
 static const saul_reg_info_t adxl345_saul_info[] =
 {
-    {
-        .name = "adxl345"
-    }
+    ADXL345_SAUL_INFO
 };
 
 #ifdef __cplusplus
