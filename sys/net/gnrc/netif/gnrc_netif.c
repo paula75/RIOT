@@ -15,6 +15,8 @@
  * @author  Oliver Hahm <oliver.hahm@inria.fr>
  */
 
+#include <string.h>
+
 #include "bitfield.h"
 #include "net/ethernet.h"
 #include "net/ipv6.h"
@@ -26,6 +28,7 @@
 #ifdef MODULE_NETSTATS_IPV6
 #include "net/netstats.h"
 #endif
+#include "fmt.h"
 #include "log.h"
 #include "sched.h"
 
@@ -313,6 +316,18 @@ int gnrc_netif_set_from_netdev(gnrc_netif_t *netif,
             res = sizeof(netopt_enable_t);
             break;
 #endif  /* MODULE_GNRC_SIXLOWPAN_IPHC */
+        case NETOPT_RAWMODE:
+            if (*(((netopt_enable_t *)opt->data)) == NETOPT_ENABLE) {
+                netif->flags |= GNRC_NETIF_FLAGS_RAWMODE;
+            }
+            else {
+                netif->flags &= ~GNRC_NETIF_FLAGS_RAWMODE;
+            }
+            /* Also propagate to the netdev device */
+            netif->dev->driver->set(netif->dev, NETOPT_RAWMODE, opt->data,
+                                      opt->data_len);
+            res = sizeof(netopt_enable_t);
+            break;
         default:
             break;
     }
@@ -353,11 +368,6 @@ gnrc_netif_t *gnrc_netif_get_by_pid(kernel_pid_t pid)
     return NULL;
 }
 
-static inline char _half_byte_to_char(uint8_t half_byte)
-{
-    return (half_byte < 10) ? ('0' + half_byte) : ('a' + (half_byte - 10));
-}
-
 char *gnrc_netif_addr_to_str(const uint8_t *addr, size_t addr_len, char *out)
 {
     char *res = out;
@@ -365,8 +375,7 @@ char *gnrc_netif_addr_to_str(const uint8_t *addr, size_t addr_len, char *out)
     assert((out != NULL) && ((addr != NULL) || (addr_len == 0U)));
     out[0] = '\0';
     for (size_t i = 0; i < addr_len; i++) {
-        *(out++) = _half_byte_to_char(*(addr) >> 4);
-        *(out++) = _half_byte_to_char(*(addr++) & 0xf);
+        out += fmt_byte_hex((out), *(addr++));
         *(out++) = (i == (addr_len - 1)) ? '\0' : ':';
     }
     return res;
@@ -861,6 +870,18 @@ int gnrc_netif_ipv6_get_iid(gnrc_netif_t *netif, eui64_t *eui64)
                 _create_iid_from_short(netif, eui64);
                 return 0;
 #endif
+#if defined(MODULE_ESP_NOW)
+            case NETDEV_TYPE_RAW:
+                eui64->uint8[0] = netif->l2addr[0] ^ 0x02;
+                eui64->uint8[1] = netif->l2addr[1];
+                eui64->uint8[2] = netif->l2addr[2];
+                eui64->uint8[3] = 0xff;
+                eui64->uint8[4] = 0xfe;
+                eui64->uint8[5] = netif->l2addr[3];
+                eui64->uint8[6] = netif->l2addr[4];
+                eui64->uint8[7] = netif->l2addr[5];
+                return 0;
+#endif
             default:
                 (void)eui64;
                 break;
@@ -1190,6 +1211,11 @@ static void _update_l2addr_from_dev(gnrc_netif_t *netif)
     if (res != -ENOTSUP) {
         netif->flags |= GNRC_NETIF_FLAGS_HAS_L2ADDR;
     }
+    else {
+        /* If no address is provided but still an address length given above,
+         * we are in an invalid state */
+        assert(netif->l2addr_len == 0);
+    }
     if (res > 0) {
         netif->l2addr_len = res;
     }
@@ -1291,7 +1317,17 @@ static void *_gnrc_netif_thread(void *args)
     dev->event_callback = _event_cb;
     dev->context = netif;
     /* initialize low-level driver */
-    dev->driver->init(dev);
+    res = dev->driver->init(dev);
+    if (res < 0) {
+        LOG_ERROR("gnrc_netif: netdev init failed: %d\n", res);
+        /* unregister this netif instance */
+        netif->ops = NULL;
+        netif->pid = KERNEL_PID_UNDEF;
+        netif->dev = NULL;
+        dev->event_callback = NULL;
+        dev->context = NULL;
+        return NULL;
+    }
     _configure_netdev(dev);
     _init_from_device(netif);
     netif->cur_hl = GNRC_NETIF_DEFAULT_HL;
