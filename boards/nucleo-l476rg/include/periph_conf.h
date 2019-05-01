@@ -26,6 +26,7 @@
 #define PERIPH_CONF_H
 
 #include "periph_cpu.h"
+#include "cfg_i2c1_pb8_pb9.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -121,6 +122,8 @@ static const uart_conf_t uart_config[] = {
         .tx_af      = GPIO_AF7,
         .bus        = APB1,
         .irqn       = USART2_IRQn,
+        .type       = STM32_USART,
+        .clk_src    = 0, /* Use APB clock */
 #ifdef UART_USE_DMA
         .dma_stream = 6,
         .dma_chan   = 4
@@ -135,6 +138,8 @@ static const uart_conf_t uart_config[] = {
         .tx_af      = GPIO_AF7,
         .bus        = APB1,
         .irqn       = USART3_IRQn,
+        .type       = STM32_USART,
+        .clk_src    = 0, /* Use APB clock */
 #ifdef UART_USE_DMA
         .dma_stream = 5,
         .dma_chan   = 4
@@ -149,6 +154,8 @@ static const uart_conf_t uart_config[] = {
         .tx_af      = GPIO_AF7,
         .bus        = APB2,
         .irqn       = USART1_IRQn,
+        .type       = STM32_USART,
+        .clk_src    = 0, /* Use APB clock */
 #ifdef UART_USE_DMA
         .dma_stream = 4,
         .dma_chan   = 4
@@ -241,29 +248,6 @@ static const spi_conf_t spi_config[] = {
 };
 
 #define SPI_NUMOF           (sizeof(spi_config) / sizeof(spi_config[0]))
-/** @} */
-
-/**
- * @name I2C configuration
- * @{
- */
-static const i2c_conf_t i2c_config[] = {
-    {
-        .dev            = I2C1,
-        .speed          = I2C_SPEED_NORMAL,
-        .scl_pin        = GPIO_PIN(PORT_B, 8),
-        .sda_pin        = GPIO_PIN(PORT_B, 9),
-        .scl_af         = GPIO_AF4,
-        .sda_af         = GPIO_AF4,
-        .bus            = APB1,
-        .rcc_mask       = RCC_APB1ENR1_I2C1EN,
-        .irqn           = I2C1_ER_IRQn,
-    }
-};
-
-#define I2C_0_ISR           isr_i2c1_er
-
-#define I2C_NUMOF           (sizeof(i2c_config) / sizeof(i2c_config[0]))
 /** @} */
 
 /**

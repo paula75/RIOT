@@ -113,6 +113,9 @@ gnrc_pktsnip_t *gnrc_pktbuf_add(gnrc_pktsnip_t *next, const void *data, size_t s
  * @param[in] size  The size of the new packet snip.
  * @param[in] type  The type of the new packet snip.
  *
+ * @note    It's not guaranteeed that `result->data` points to the same address
+ *          as the original `pkt->data`.
+ *
  * @return  The new packet snip in @p pkt on success.
  * @return  NULL, if pkt == NULL or size == 0 or size > pkt->size or pkt->data == NULL.
  * @return  NULL, if no space is left in the packet buffer.
@@ -186,23 +189,6 @@ static inline void gnrc_pktbuf_release(gnrc_pktsnip_t *pkt)
  *          enough space in the packet buffer.
  */
 gnrc_pktsnip_t *gnrc_pktbuf_start_write(gnrc_pktsnip_t *pkt);
-
-/**
- * @brief   Create a IOVEC representation of the packet pointed to by *pkt*
- *
- * @pre `(len != NULL)`
- *
- * @details This function will create a new packet snip in the packet buffer,
- *          which points to the given *pkt* and contains a IOVEC representation
- *          of the referenced packet in its data section.
- *
- * @param[in]  pkt  Packet to export as IOVEC
- * @param[out] len  Number of elements in the IOVEC
- *
- * @return  Pointer to the 'IOVEC packet snip'
- * @return  NULL, if packet is empty of the packet buffer is full
- */
-gnrc_pktsnip_t *gnrc_pktbuf_get_iovec(gnrc_pktsnip_t *pkt, size_t *len);
 
 /**
  * @brief   Deletes a snip from a packet and the packet buffer.
@@ -286,8 +272,8 @@ gnrc_pktsnip_t *gnrc_pktbuf_reverse_snips(gnrc_pktsnip_t *pkt);
  *        The original snip is keeped as is except `users` decremented.
  *
  * @deprecated  This function breaks the abstraction of `gnrc_pktbuf` and its
- *              only user within the RIOT code base `gnrc_ipv6_ext` is going to
- *              be reworked so it isn't needed anymore.
+ *              only user within the RIOT code base `gnrc_ipv6_ext` was reworked
+ *              so it isn't needed anymore.
  *              It will be removed after the 2019.04 release.
  *
  * @param[in,out] pkt   The snip to duplicate.
@@ -297,6 +283,60 @@ gnrc_pktsnip_t *gnrc_pktbuf_reverse_snips(gnrc_pktsnip_t *pkt);
  * @return NULL, if no space is left in the packet buffer.
  */
 gnrc_pktsnip_t *gnrc_pktbuf_duplicate_upto(gnrc_pktsnip_t *pkt, gnrc_nettype_t type);
+
+/**
+ * @brief   Merge pktsnip chain to single pktsnip.
+ *
+ * Specifically it calls @ref gnrc_pktbuf_realloc_data() on @p pkt, then copies
+ * the data of all following packet snips into that reallocated space, and
+ * removes the packet snip the data was copied from afterwards.
+ *
+ * ### Example
+ * #### Input
+ *
+ *                                                         buffer
+ *     +---------------------------+                      +------+
+ *     | size = 8                  | data       +-------->|      |
+ *     | type = NETTYPE_IPV6       |------------+         +------+
+ *     +---------------------------+                      .      .
+ *           | next                                       .      .
+ *           v                                            .      .
+ *     +---------------------------+                      +------+
+ *     | size = 40                 | data    +----------->|      |
+ *     | type = NETTYPE_UDP        |---------+            +------+
+ *     +---------------------------+                      .      .
+ *           | next                                       .      .
+ *           v
+ *     +---------------------------+                      +------+
+ *     | size = 14                 | data +-------------->|      |
+ *     | type = NETTYPE_UNDEF      |------+               +------+
+ *     +---------------------------+                      .      .
+ *
+ *
+ * #### Output
+ *
+ *                                                         buffer
+ *     +---------------------------+                      +------+
+ *     | size = 62                 | data       +-------->|      |
+ *     | type = NETTYPE_IPV6       |------------+         |      |
+ *     +---------------------------+                      |      |
+ *                                                        |      |
+ *                                                        |      |
+ *                                                        |      |
+ *                                                        +------+
+ *                                                                 .      .
+ *
+ * @warning @p pkt needs to write protected before calling this function.
+ * @note    Packets in receive order need to call
+ *          @ref gnrc_pktbuf_reverse_snips() first to get the data in the
+ *          correct order.
+ *
+ * @param[in,out] pkt   The snip to merge.
+ *
+ * @return  0, on success
+ * @return  ENOMEM, if no space is left in the packet buffer.
+ */
+int gnrc_pktbuf_merge(gnrc_pktsnip_t *pkt);
 
 #ifdef DEVELHELP
 /**

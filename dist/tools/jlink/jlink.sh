@@ -13,28 +13,31 @@
 # JLINK_IF:         Interface used by JLink, default: "SWD"
 # JLINK_SPEED:      Interface clock speed to use (in kHz), default "2000"
 # FLASH_ADDR:       Starting address of the target's flash memory, default: "0"
+# IMAGE_OFFSET:     Offset from the targets flash memory, for flashing the image
 # JLINK_PRE_FLASH:  Additional JLink commands to execute before flashing
 # JLINK_POST_FLASH: Additional JLink commands to execute after flashing
 #
 # The script supports the following actions:
 #
-# flash:        flash a given hex file to the target.
-#               hexfile is expected in ihex format and is pointed to
-#               by BINFILE environment variable
+# flash:        flash <binfile>
+#
+#               flash given binary format file to the target.
 #
 #               options:
-#               BINFILE: path to the binary file that is flashed
+#               <binfile>:      path to the binary file that is flashed
 #
-# debug:        starts JLink as GDB server in the background and
+# debug:        debug <elffile>
+#
+#               starts JLink as GDB server in the background and
 #               connects to the server with the GDB client specified by
 #               the board (DBG environment variable)
 #
 #               options:
+#               <elffile>:      path to the ELF file to debug
 #               GDB_PORT:       port opened for GDB connections
 #               TELNET_PORT:    port opened for telnet connections
 #               DBG:            debugger client command, default: 'gdb -q'
 #               TUI:            if TUI!=null, the -tui option will be used
-#               ELFFILE:        path to the ELF file to debug
 #
 # debug-server: starts JLink as GDB server, but does not connect to
 #               to it with any frontend. This might be useful when using
@@ -48,6 +51,9 @@
 #
 #
 # @author       Hauke Peteresen <hauke.petersen@fu-berlin.de>
+
+# Set IMAGE_OFFSET to zero by default.
+: ${IMAGE_OFFSET:=0}
 
 # default GDB port
 _GDB_PORT=3333
@@ -88,10 +94,10 @@ test_config() {
     fi
 }
 
-test_hexfile() {
-    if [ ! -f "${HEXFILE}" ]; then
-        echo "Error: Unable to locate HEXFILE"
-        echo "       (${HEXFILE})"
+test_binfile() {
+    if [ ! -f "${BINFILE}" ]; then
+        echo "Error: Unable to locate BINFILE"
+        echo "       (${BINFILE})"
         exit 1
     fi
 }
@@ -145,22 +151,26 @@ test_term() {
 # now comes the actual actions
 #
 do_flash() {
+    BINFILE=$1
     test_config
     test_serial
-    test_hexfile
+    test_binfile
     # clear any existing contents in burn file
     /bin/echo -n "" > ${BINDIR}/burn.seg
     # create temporary burn file
     if [ ! -z "${JLINK_PRE_FLASH}" ]; then
         printf "${JLINK_PRE_FLASH}\n" >> ${BINDIR}/burn.seg
     fi
-    echo "loadbin ${HEXFILE} ${FLASH_ADDR}" >> ${BINDIR}/burn.seg
+    # address to flash is hex formatted, as required by JLink
+    ADDR_TO_FLASH=$(printf "0x%08x\n" "$((${FLASH_ADDR} + ${IMAGE_OFFSET}))")
+    echo "loadbin ${BINFILE} ${ADDR_TO_FLASH}" >> ${BINDIR}/burn.seg
     if [ ! -z "${JLINK_POST_FLASH}" ]; then
         printf "${JLINK_POST_FLASH}\n" >> ${BINDIR}/burn.seg
     fi
     cat ${RIOTTOOLS}/jlink/reset.seg >> ${BINDIR}/burn.seg
     # flash device
     sh -c "${JLINK} ${JLINK_SERIAL} \
+                    -ExitOnError 1 \
                     -device '${JLINK_DEVICE}' \
                     -speed '${JLINK_SPEED}' \
                     -if '${JLINK_IF}' \
@@ -169,6 +179,7 @@ do_flash() {
 }
 
 do_debug() {
+    ELFFILE=$1
     test_config
     test_serial
     test_elffile
@@ -208,6 +219,7 @@ do_reset() {
     test_serial
     # reset the board
     sh -c "${JLINK} ${JLINK_SERIAL} \
+                    -ExitOnError 1 \
                     -device '${JLINK_DEVICE}' \
                     -speed '${JLINK_SPEED}' \
                     -if '${JLINK_IF}' \
@@ -235,6 +247,7 @@ do_term() {
     trap '' INT
     # start Jlink as RTT server
     sh -c "${JLINK} ${JLINK_SERIAL} \
+            -ExitOnError 1 \
             -device '${JLINK_DEVICE}' \
             -speed '${JLINK_SPEED}' \
             -if '${JLINK_IF}' \
@@ -254,7 +267,7 @@ shift # pop $1 from $@
 case "${ACTION}" in
   flash)
     echo "### Flashing Target ###"
-    echo "### Flashing at address ${FLASH_ADDR} ###"
+    echo "### Flashing at base address ${FLASH_ADDR} with offset ${IMAGE_OFFSET} ###"
     do_flash "$@"
     ;;
   debug)
@@ -275,5 +288,7 @@ case "${ACTION}" in
     ;;
   *)
     echo "Usage: $0 {flash|debug|debug-server|reset}"
+    echo "          flash <binfile>"
+    echo "          debug <elffile>"
     ;;
 esac

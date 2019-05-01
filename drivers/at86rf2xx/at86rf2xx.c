@@ -43,7 +43,7 @@ void at86rf2xx_setup(at86rf2xx_t *dev, const at86rf2xx_params_t *params)
 
     netdev->driver = &at86rf2xx_driver;
     /* initialize device descriptor */
-    memcpy(&dev->params, params, sizeof(at86rf2xx_params_t));
+    dev->params = *params;
     /* State to return after receiving or transmitting */
     dev->idle_state = AT86RF2XX_STATE_TRX_OFF;
     /* radio state is P_ON when first powered-on */
@@ -73,8 +73,6 @@ void at86rf2xx_reset(at86rf2xx_t *dev)
     at86rf2xx_set_addr_long(dev, ntohll(addr_long.uint64.u64));
     at86rf2xx_set_addr_short(dev, ntohs(addr_long.uint16[0].u16));
 
-    /* set default PAN id */
-    at86rf2xx_set_pan(dev, AT86RF2XX_DEFAULT_PANID);
     /* set default channel */
     at86rf2xx_set_chan(dev, AT86RF2XX_DEFAULT_CHANNEL);
     /* set default TX power */

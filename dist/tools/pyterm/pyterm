@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # Copyright (C) 2014  Oliver Hahm <oliver.hahm@inria.fr>
@@ -246,6 +246,9 @@ class SerCmd(cmd.Cmd):
             except OSError as e:
                 self.logger.error("Cannot connect to serial port {}: {}"
                                   .format(self.port, e.strerror))
+                sys.exit(1)
+            except serial.SerialException as e:
+                self.logger.error("%s", e.strerror)
                 sys.exit(1)
 
         # wait until connection is established and fire startup

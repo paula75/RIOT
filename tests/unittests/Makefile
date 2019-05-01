@@ -7,6 +7,7 @@ BOARD_INSUFFICIENT_MEMORY := airfy-beacon \
                              arduino-mkr1000 \
                              arduino-mkrfox1200 \
                              arduino-mkrzero \
+                             arduino-nano \
                              arduino-uno \
                              arduino-zero \
                              avsextrem \
@@ -21,6 +22,7 @@ BOARD_INSUFFICIENT_MEMORY := airfy-beacon \
                              ek-lm4f120xl \
                              feather-m0 \
                              firefly \
+                             hamilton \
                              ikea-tradfri \
                              limifrog-v1 maple-mini \
                              lobaro-lorabox \
@@ -30,6 +32,7 @@ BOARD_INSUFFICIENT_MEMORY := airfy-beacon \
                              msb-430 \
                              msb-430h \
                              msba2 \
+                             nrf51dk \
                              nrf51dongle \
                              nrf6310 \
                              nucleo-f031k6 \
@@ -57,6 +60,8 @@ BOARD_INSUFFICIENT_MEMORY := airfy-beacon \
                              remote-pa \
                              remote-reva \
                              remote-revb \
+                             saml10-xpro \
+                             saml11-xpro \
                              saml21-xpro \
                              samd21-xpro \
                              samr21-xpro \
@@ -69,6 +74,7 @@ BOARD_INSUFFICIENT_MEMORY := airfy-beacon \
                              sodaq-autonomo \
                              sodaq-explorer \
                              sodaq-one \
+                             sodaq-sara-aff \
                              spark-core \
                              stk3600 \
                              stm32f0discovery \
@@ -93,7 +99,7 @@ endif
 ARM7_BOARDS := avsextrem \
                msba2 \
                #
-DISABLE_TEST_FOR_ARM7 := tests-relic tests-cpp_%
+DISABLE_TEST_FOR_ARM7 := tests-cpp_%
 
 ARM_CORTEX_M_BOARDS := airfy-beacon \
                        arduino-due \
@@ -124,6 +130,7 @@ ARM_CORTEX_M_BOARDS := airfy-beacon \
                        microbit \
                        msbiot \
                        mulle \
+                       nrf51dk \
                        nrf51dongle \
                        nrf52840dk \
                        nrf52dk \
@@ -167,6 +174,8 @@ ARM_CORTEX_M_BOARDS := airfy-beacon \
                        remote-pa \
                        remote-reva \
                        remote-revb \
+                       saml10-xpro \
+                       saml11-xpro \
                        samd21-xpro \
                        saml21-xpro \
                        samr21-xpro \
@@ -188,16 +197,17 @@ ARM_CORTEX_M_BOARDS := airfy-beacon \
                        stm32f4discovery \
                        stm32f769i-disco \
                        udoo \
+                       usb-kw41z \
                        yunjia-nrf51822 \
                        #
-DISABLE_TEST_FOR_ARM_CORTEX_M := tests-relic
+DISABLE_TEST_FOR_ARM_CORTEX_M :=
 
 AVR_BOARDS := arduino-duemilanove \
               arduino-mega2560 \
               arduino-uno \
               waspmote-pro \
               #
-DISABLE_TEST_FOR_AVR := tests-relic tests-cpp_%
+DISABLE_TEST_FOR_AVR := tests-cpp_%
 
 MSP430_BOARDS := chronos \
                  msb-430 \
@@ -207,7 +217,7 @@ MSP430_BOARDS := chronos \
                  wsn430-v1_4 \
                  z1 \
                  #
-DISABLE_TEST_FOR_MSP430 := tests-relic tests-spiffs tests-cpp_%
+DISABLE_TEST_FOR_MSP430 := tests-spiffs tests-cpp_%
 
 ifneq (, $(filter $(ARM7_BOARDS), $(BOARD)))
   UNIT_TESTS := $(filter-out $(DISABLE_TEST_FOR_ARM7), $(UNIT_TESTS))
@@ -229,10 +239,6 @@ ifneq (,$(filter tests-cpp_%, $(UNIT_TESTS)))
   # We need to tell the build system to use the C++ compiler for linking
   export FEATURES_REQUIRED += cpp
   export CPPMIX := 1
-endif
-
-ifneq (, $(filter $(AVR_BOARDS), $(BOARD)))
-  LARGE_STACK_TESTS += tests-qDSA
 endif
 
 ifneq (,$(filter $(LARGE_STACK_TESTS), $(UNIT_TESTS)))

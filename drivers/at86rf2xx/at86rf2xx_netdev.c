@@ -88,10 +88,6 @@ static int _init(netdev_t *netdev)
         return -1;
     }
 
-#ifdef MODULE_NETSTATS_L2
-    memset(&netdev->stats, 0, sizeof(netstats_t));
-#endif
-
     return 0;
 }
 
@@ -110,10 +106,9 @@ static int _send(netdev_t *netdev, const iolist_t *iolist)
                   (unsigned)len + 2);
             return -EOVERFLOW;
         }
-#ifdef MODULE_NETSTATS_L2
-        netdev->stats.tx_bytes += len;
-#endif
-        len = at86rf2xx_tx_load(dev, iol->iol_base, iol->iol_len, len);
+        if (iol->iol_len) {
+            len = at86rf2xx_tx_load(dev, iol->iol_base, iol->iol_len, len);
+        }
     }
 
     /* send data out directly if pre-loading id disabled */
@@ -167,10 +162,6 @@ static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
         at86rf2xx_set_state(dev, dev->idle_state);
         return -ENOBUFS;
     }
-#ifdef MODULE_NETSTATS_L2
-    netdev->stats.rx_count++;
-    netdev->stats.rx_bytes += pkt_len;
-#endif
     /* copy payload */
     at86rf2xx_fb_read(dev, (uint8_t *)buf, pkt_len);
 
@@ -180,37 +171,36 @@ static int _recv(netdev_t *netdev, void *buf, size_t len, void *info)
     at86rf2xx_fb_read(dev, tmp, 2);
     (void)tmp;
 
-    /* at86rf212  RSSI_BASE_VAL +3.1*RSSI, base varies for diff. modulation and datarates
-     * at86RF232  RSSI_BASE_VAL +3.0*RSSI, base -91dBm
-     * at86RF233  RSSI_BASE_VAL +3.0*RSSI, base -94dBm
-     * at86RF231  RSSI_BASE_VAL +3.0*(RSSI-1), base -91dBm
-     * at***RFR2  RSSI_BASE_VAL +3.0*(RSSI-1), base -90dBm
+    /* AT86RF212B RSSI_BASE_VAL + 1.03 * ED, base varies for diff. modulation and datarates
+     * AT86RF232  RSSI_BASE_VAL + ED, base -91dBm
+     * AT86RF233  RSSI_BASE_VAL + ED, base -94dBm
+     * AT86RF231  RSSI_BASE_VAL + ED, base -91dBm
+     * AT***RFR2  RSSI_BASE_VAL + ED, base -90dBm
      *
-     * AT86RF231 MAN. p.89 8.3.2 Reading RSSI
-     * AT86RF232 MAN. p.88 8.3.2 Reading RSSI
-     * AT86RF233 MAN. p.99 8.4.2 Reading RSSI
-     * "It is not recommended reading the RSSI value when using the Extended
-     * Operating Modes, use ED instead"
-     * at86RF231  RSSI_BASE_VAL +ED, base -90dBm
-     * at86RF232  RSSI_BASE_VAL +ED, base -91dBm
-     * at86RF233  RSSI_BASE_VAL +ED, base -94dBm
-     * at***RFR2  RSSI_BASE_VAL +ED, base -90dBm
+     * AT86RF231 MAN. p.92, 8.4.3 Data Interpretation
+     * AT86RF232 MAN. p.91, 8.4.3 Data Interpretation
+     * AT86RF233 MAN. p.102, 8.5.3 Data Interpretation
+     *
+     * for performance reasons we ignore the 1.03 scale factor on the 212B,
+     * which causes a slight error in the values, but the accuracy of the ED
+     * value is specified as +/- 5 dB, so it should not matter very much in real
+     * life.
      */
     if (info != NULL) {
-        uint8_t rssi = 0;
+        uint8_t ed = 0;
         netdev_ieee802154_rx_info_t *radio_info = info;
+        at86rf2xx_fb_read(dev, &(radio_info->lqi), 1);
 
-#if defined(MODULE_AT86RF231) || defined(MODULE_AT86RF232) || defined(MODULE_AT86RF233)
-        at86rf2xx_fb_read(dev, &(radio_info->lqi), 1);
+#if defined(MODULE_AT86RF231)
+        /* AT86RF231 does not provide ED at the end of the frame buffer, read
+         * from separate register instead */
         at86rf2xx_fb_stop(dev);
-        rssi = at86rf2xx_reg_read(dev, AT86RF2XX_REG__PHY_ED_LEVEL);
+        ed = at86rf2xx_reg_read(dev, AT86RF2XX_REG__PHY_ED_LEVEL);
 #else
-        at86rf2xx_fb_read(dev, &(radio_info->lqi), 1);
-        at86rf2xx_fb_read(dev, &(rssi), 1);
+        at86rf2xx_fb_read(dev, &ed, 1);
         at86rf2xx_fb_stop(dev);
-        rssi = 3 * rssi;
 #endif
-        radio_info->rssi = RSSI_BASE_VAL + rssi;
+        radio_info->rssi = RSSI_BASE_VAL + ed;
         DEBUG("[at86rf2xx] LQI:%d high is good, RSSI:%d high is either good or"
               "too much interference.\n", radio_info->lqi, radio_info->rssi);
     }

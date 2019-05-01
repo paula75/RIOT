@@ -47,16 +47,6 @@ extern "C" {
 /** @} */
 
 /**
- * @brief   Definition of a fitting UNDEF value
- */
-#define GPIO_UNDEF (0xff)
-
-/**
- * @brief   Define CPU specific GPIO pin generator macro
- */
-#define GPIO_PIN(x, y)  ((x << 4) | y)
-
-/**
  * @brief   Define CPU specific number of GPIO pins
  * @{
  */
@@ -206,10 +196,14 @@ typedef enum {
  */
 #define HAVE_ADC_RES_T
 typedef enum {
-    ADC_RES_9BIT = 0,       /**< ADC resolution: 9 bit */
-    ADC_RES_10BIT,          /**< ADC resolution: 10 bit */
-    ADC_RES_11BIT,          /**< ADC resolution: 11 bit */
-    ADC_RES_12BIT,          /**< ADC resolution: 12 bit */
+    ADC_RES_6BIT  = 0xf0,   /**< ADC resolution: 6 bit is not supported */
+    ADC_RES_8BIT  = 0xf1,   /**< ADC resolution: 8 bit is not supported  */
+    ADC_RES_9BIT  = 0,      /**< ADC resolution: 9 bit */
+    ADC_RES_10BIT = 1,      /**< ADC resolution: 10 bit */
+    ADC_RES_11BIT = 2,      /**< ADC resolution: 11 bit */
+    ADC_RES_12BIT = 3,      /**< ADC resolution: 12 bit */
+    ADC_RES_14BIT = 0xf2,   /**< ADC resolution: 14 bit is not supported */
+    ADC_RES_16BIT = 0xf3,   /**< ADC resolution: 16 bit is not supported */
 } adc_res_t;
 /** @} */
 
@@ -335,46 +329,32 @@ extern const unsigned pwm_dev_num;
  *
  * ESP32 has four SPI controllers:
  *
- * - controller SPI0 is reserved for accessing flash memory
- * - controller SPI1 realizes interface FSPI and shares its signals with SPI0
+ * - controller SPI0 is reserved for caching the flash memory
+ * - controller SPI1 is reserved for external memories like flash and PSRAM
  * - controller SPI2 realizes interface HSPI that can be used for peripherals
  * - controller SPI3 realizes interface VSPI that can be used for peripherals
  *
- * At most three interfaces can be used:
+ * Thus, a maximum of two SPI controllers can be used as peripheral interfaces:
  *
- * - VSPI with configurable pin definitions
- * - HSPI with configurable pin definitions
- * - FSPI with fixed pin definitions except the CS signal
+ * - VSPI
+ * - HSPI
  *
- * All SPI interfaces could be used in quad SPI mode, but RIOT's low level
+ * SPI interfaces could be used in quad SPI mode, but RIOT's low level
  * device driver doesn't support it.
- *
- * @note
- * - Since the FSPI interface shares its bus signals with the controller
- *   that implements the flash memory interface, we use the name FSPI for this
- *   interface. In the technical reference, this interface is misleadingly
- *   simply referred to as SPI.
- * - Since the FSPI interface shares its bus signals with flash
- *   memory interface and optionally other external memories, you can only use
- *   this SPI interface to attach external memory with same SPI mode and same
- *   bus speed but with a different CS.
- * - Using FSPI for anything else can disturb flash memory access which
- *   causes a number of problems. If not really necessary, you should not use
- *   this interface.
  *
  * The board-specific configuration of the SPI interface SPI_DEV(n) requires
  * the defintion of
  *
- * SPIn_DEV, the interface which can be VSPI, HSPI, or FSPI,
- * SPIn_SCK, the GPIO used as clock signal (fixed for FSPI),
- * SPIn_MISO, the GPIO used as MISO signal (fixed for FSPI),
- * SPIn_MOSI, the GPIO used as MOSI signal (fixed for FSPI), and
- * SPIn_CS0, the GPIO used as CS signal when cs parameter in spi_aquire is GPIO_UNDEF,
+ * - SPIn_CTRL, the SPI controller which is used for the interface (VSPI or HSPI),
+ * - SPIn_SCK, the GPIO used as clock signal
+ * - SPIn_MISO, the GPIO used as MISO signal
+ * - SPIn_MOSI, the GPIO used as MOSI signal, and
+ * - SPIn_CS0, the GPIO used as CS signal when the cs parameter in spi_aquire
+ *   is GPIO_UNDEF,
  *
- * where n can be 0, 1 or 2. If they are not defined, the SPI interface
- * SPI_DEV(n) is not used.
+ * where n can be 0 or 1.
  *
- * @note The configuration of the SPI interfaces SPI_DEV(n) must be in
+ * @note The configuration of the SPI interfaces SPI_DEV(n) should be in
  * continuous ascending order of n.
  *
  * SPI_NUMOF is determined automatically from the board-specific peripheral

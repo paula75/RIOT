@@ -31,6 +31,7 @@ extern "C" {
  */
 #define CLOCK_HSI           (16000000U)         /* internal oscillator */
 #define CLOCK_CORECLOCK     (32000000U)         /* desired core clock frequency */
+#define CLOCK_LSE           (1)                 /* enable low speed external oscillator */
 
 /* configuration of PLL prescaler and multiply values */
 /* CORECLOCK := HSI / CLOCK_PLL_DIV * CLOCK_PLL_MUL */
@@ -47,6 +48,28 @@ extern "C" {
 #define CLOCK_AHB           (CLOCK_CORECLOCK / 1)
 #define CLOCK_APB2          (CLOCK_CORECLOCK / 1)
 #define CLOCK_APB1          (CLOCK_CORECLOCK / 1)
+/** @} */
+
+/**
+ * @name    DMA streams configuration
+ * @{
+ */
+#ifdef MODULE_PERIPH_DMA
+static const dma_conf_t dma_config[] = {
+    { .stream = 1  }, /* channel 2 */
+    { .stream = 2  }, /* channel 3 */
+    { .stream = 3  }, /* channel 4 */
+    { .stream = 4  }, /* channel 5 */
+    { .stream = 5  }, /* channel 6 */
+};
+
+#define DMA_SHARED_ISR_0            isr_dma1_channel2_3
+#define DMA_SHARED_ISR_0_STREAMS    { 0, 1 } /* Indexes 0 and 1 of dma_config share the same isr */
+#define DMA_SHARED_ISR_1            isr_dma1_channel4_5_6_7
+#define DMA_SHARED_ISR_1_STREAMS    { 2, 3, 4 } /* Indexes 2, 3 and 4 of dma_config share the same isr */
+
+#define DMA_NUMOF           (sizeof(dma_config) / sizeof(dma_config[0]))
+#endif
 /** @} */
 
 /**
@@ -81,7 +104,13 @@ static const uart_conf_t uart_config[] = {
         .rx_af      = GPIO_AF4,
         .tx_af      = GPIO_AF4,
         .bus        = APB1,
-        .irqn       = USART2_IRQn
+        .irqn       = USART2_IRQn,
+        .type       = STM32_USART,
+        .clk_src    = 0, /* Use APB clock */
+#ifdef MODULE_PERIPH_DMA
+        .dma        = 2,
+        .dma_chan   = 4,
+#endif
     },
     {
         .dev        = USART1,
@@ -91,7 +120,13 @@ static const uart_conf_t uart_config[] = {
         .rx_af      = GPIO_AF4,
         .tx_af      = GPIO_AF4,
         .bus        = APB2,
-        .irqn       = USART1_IRQn
+        .irqn       = USART1_IRQn,
+        .type       = STM32_USART,
+        .clk_src    = 0, /* Use APB clock */
+#ifdef MODULE_PERIPH_DMA
+        .dma        = 0,
+        .dma_chan   = 3,
+#endif
     },
 };
 
@@ -134,7 +169,13 @@ static const spi_conf_t spi_config[] = {
         .cs_pin   = GPIO_UNDEF,
         .af       = GPIO_AF0,
         .rccmask  = RCC_APB1ENR_SPI2EN,
-        .apbbus   = APB1
+        .apbbus   = APB1,
+#ifdef MODULE_PERIPH_DMA
+        .tx_dma   = 3,
+        .tx_dma_chan = 2,
+        .rx_dma   = 2,
+        .rx_dma_chan = 2,
+#endif
     },
     {
         .dev      = SPI1, /* connected to SX1276 */
@@ -144,7 +185,13 @@ static const spi_conf_t spi_config[] = {
         .cs_pin   = GPIO_UNDEF,
         .af       = GPIO_AF0,
         .rccmask  = RCC_APB2ENR_SPI1EN,
-        .apbbus   = APB2
+        .apbbus   = APB2,
+#ifdef MODULE_PERIPH_DMA
+        .tx_dma   = 1,
+        .tx_dma_chan = 1,
+        .rx_dma   = 0,
+        .rx_dma_chan = 1,
+#endif
     },
 };
 
@@ -175,10 +222,14 @@ static const i2c_conf_t i2c_config[] = {
 /** @} */
 
 /**
- * @name    ADC configuration
+ * @name    RTT configuration
+ *
+ * On the STM32Lx platforms, we always utilize the LPTIM1.
  * @{
  */
-#define ADC_NUMOF           (0)
+#define RTT_NUMOF           (1)
+#define RTT_FREQUENCY       (1024U)             /* 32768 / 2^n */
+#define RTT_MAX_VALUE       (0x0000ffff)        /* 16-bit timer */
 /** @} */
 
 /**

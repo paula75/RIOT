@@ -131,7 +131,7 @@ static void test_creation(void)
 #ifdef DEVELHELP
     TEST_ASSERT_EQUAL_STRING("eth", sched_threads[ethernet_netif->pid]->name);
 #endif
-    TEST_ASSERT_NOT_NULL(sched_threads[ethernet_netif->pid]->msg_array);
+    TEST_ASSERT(thread_has_msg_queue(sched_threads[ethernet_netif->pid]));
 
     TEST_ASSERT_NOT_NULL((ieee802154_netif = gnrc_netif_ieee802154_create(
             ieee802154_netif_stack, IEEE802154_STACKSIZE, GNRC_NETIF_PRIO,
@@ -153,7 +153,7 @@ static void test_creation(void)
 #ifdef DEVELHELP
     TEST_ASSERT_EQUAL_STRING("wpan", sched_threads[ieee802154_netif->pid]->name);
 #endif
-    TEST_ASSERT_NOT_NULL(sched_threads[ieee802154_netif->pid]->msg_array);
+    TEST_ASSERT(thread_has_msg_queue(sched_threads[ieee802154_netif->pid]));
 
     for (unsigned i = 0; i < DEFAULT_DEVS_NUMOF; i++) {
         TEST_ASSERT_NOT_NULL((netifs[i] = gnrc_netif_create(
@@ -163,9 +163,9 @@ static void test_creation(void)
         TEST_ASSERT_NOT_NULL(netifs[i]->ops);
         TEST_ASSERT_NOT_NULL(netifs[i]->dev);
         TEST_ASSERT_EQUAL_INT(GNRC_NETIF_DEFAULT_HL, netifs[i]->cur_hl);
-        TEST_ASSERT_EQUAL_INT(NETDEV_TYPE_UNKNOWN, netifs[i]->device_type);
+        TEST_ASSERT_EQUAL_INT(NETDEV_TYPE_TEST, netifs[i]->device_type);
         TEST_ASSERT(netifs[i]->pid > KERNEL_PID_UNDEF);
-        TEST_ASSERT_NOT_NULL(sched_threads[netifs[i]->pid]->msg_array);
+        TEST_ASSERT(thread_has_msg_queue(sched_threads[netifs[i]->pid]));
         TEST_ASSERT_EQUAL_INT(i + SPECIAL_DEVS + 1, gnrc_netif_numof());
         for (unsigned j = 0; j < (i + SPECIAL_DEVS + 1); j++) {
             TEST_ASSERT_NOT_NULL((ptr = gnrc_netif_iter(ptr)));
@@ -651,10 +651,12 @@ static void test_ipv6_get_iid(void)
     eui64_t res;
     uint16_t ieee802154_l2addr_len = 2U;
 
-    TEST_ASSERT_EQUAL_INT(0, gnrc_netif_ipv6_get_iid(ethernet_netif, &res));
+    TEST_ASSERT_EQUAL_INT(sizeof(eui64_t),
+                          gnrc_netif_ipv6_get_iid(ethernet_netif, &res));
     TEST_ASSERT_EQUAL_INT(0, memcmp(&res, &ethernet_ipv6_ll.u64[1],
                                     sizeof(res)));
-    TEST_ASSERT_EQUAL_INT(0, gnrc_netif_ipv6_get_iid(ieee802154_netif, &res));
+    TEST_ASSERT_EQUAL_INT(sizeof(eui64_t),
+                          gnrc_netif_ipv6_get_iid(ieee802154_netif, &res));
     TEST_ASSERT_EQUAL_INT(0, memcmp(&res, &ieee802154_ipv6_ll_long.u64[1],
                                     sizeof(res)));
     TEST_ASSERT_EQUAL_INT(sizeof(ieee802154_l2addr_len),
@@ -662,7 +664,8 @@ static void test_ipv6_get_iid(void)
                                           NETOPT_SRC_LEN, 0,
                                           &ieee802154_l2addr_len,
                                           sizeof(ieee802154_l2addr_len)));
-    TEST_ASSERT_EQUAL_INT(0, gnrc_netif_ipv6_get_iid(ieee802154_netif, &res));
+    TEST_ASSERT_EQUAL_INT(sizeof(eui64_t),
+                          gnrc_netif_ipv6_get_iid(ieee802154_netif, &res));
     TEST_ASSERT_EQUAL_INT(0, memcmp(&res, &ieee802154_eui64_short, sizeof(res)));
     /* reset to source length 8 */
     ieee802154_l2addr_len = 8U;
@@ -771,32 +774,32 @@ static void test_netapi_get__MAX_PACKET_SIZE(void)
     uint16_t value;
 
     TEST_ASSERT_EQUAL_INT(sizeof(uint16_t), gnrc_netapi_get(ethernet_netif->pid,
-                                                            NETOPT_MAX_PACKET_SIZE,
+                                                            NETOPT_MAX_PDU_SIZE,
                                                             GNRC_NETTYPE_IPV6,
                                                             &value, sizeof(value)));
     TEST_ASSERT_EQUAL_INT(ETHERNET_DATA_LEN, value);
     TEST_ASSERT_EQUAL_INT(sizeof(uint16_t), gnrc_netapi_get(ethernet_netif->pid,
-                                                            NETOPT_MAX_PACKET_SIZE,
+                                                            NETOPT_MAX_PDU_SIZE,
                                                             GNRC_NETTYPE_NETIF,
                                                             &value, sizeof(value)));
     TEST_ASSERT_EQUAL_INT(ETHERNET_DATA_LEN, value);
     TEST_ASSERT_EQUAL_INT(sizeof(uint16_t), gnrc_netapi_get(ieee802154_netif->pid,
-                                                            NETOPT_MAX_PACKET_SIZE,
+                                                            NETOPT_MAX_PDU_SIZE,
                                                             GNRC_NETTYPE_IPV6,
                                                             &value, sizeof(value)));
     TEST_ASSERT_EQUAL_INT(IPV6_MIN_MTU, value);
     TEST_ASSERT_EQUAL_INT(sizeof(uint16_t), gnrc_netapi_get(ieee802154_netif->pid,
-                                                            NETOPT_MAX_PACKET_SIZE,
+                                                            NETOPT_MAX_PDU_SIZE,
                                                             GNRC_NETTYPE_NETIF,
                                                             &value, sizeof(value)));
     TEST_ASSERT_EQUAL_INT(TEST_IEEE802154_MAX_FRAG_SIZE, value);
     TEST_ASSERT_EQUAL_INT(sizeof(uint16_t), gnrc_netapi_get(netifs[0]->pid,
-                                                            NETOPT_MAX_PACKET_SIZE,
+                                                            NETOPT_MAX_PDU_SIZE,
                                                             GNRC_NETTYPE_IPV6,
                                                             &value, sizeof(value)));
     TEST_ASSERT_EQUAL_INT(IPV6_MIN_MTU, value);
     TEST_ASSERT_EQUAL_INT(sizeof(uint16_t), gnrc_netapi_get(netifs[0]->pid,
-                                                            NETOPT_MAX_PACKET_SIZE,
+                                                            NETOPT_MAX_PDU_SIZE,
                                                             GNRC_NETTYPE_NETIF,
                                                             &value, sizeof(value)));
     TEST_ASSERT_EQUAL_INT(IPV6_MIN_MTU, value);
@@ -932,13 +935,13 @@ static void test_netapi_set__MAX_PACKET_SIZE(void)
 
     TEST_ASSERT_EQUAL_INT(sizeof(value),
                           gnrc_netapi_set(netifs[0]->pid,
-                                          NETOPT_MAX_PACKET_SIZE,
+                                          NETOPT_MAX_PDU_SIZE,
                                           GNRC_NETTYPE_IPV6,
                                           &value, sizeof(value)));
     TEST_ASSERT_EQUAL_INT(value, netifs[0]->ipv6.mtu);
     TEST_ASSERT_EQUAL_INT(-ENOTSUP,
                           gnrc_netapi_set(netifs[0]->pid,
-                                          NETOPT_MAX_PACKET_SIZE, 0,
+                                          NETOPT_MAX_PDU_SIZE, 0,
                                           &value, sizeof(value)));
 }
 

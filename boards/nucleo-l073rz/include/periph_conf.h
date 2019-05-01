@@ -35,6 +35,7 @@ extern "C" {
  */
 #define CLOCK_HSI           (16000000U)         /* internal oscillator */
 #define CLOCK_CORECLOCK     (32000000U)         /* desired core clock frequency */
+#define CLOCK_LSE           (1)                 /* enable low speed external oscillator */
 
 /* configuration of PLL prescaler and multiply values */
 /* CORECLOCK := HSI / CLOCK_PLL_DIV * CLOCK_PLL_MUL */
@@ -85,7 +86,9 @@ static const uart_conf_t uart_config[] = {
         .rx_af      = GPIO_AF4,
         .tx_af      = GPIO_AF4,
         .bus        = APB1,
-        .irqn       = USART2_IRQn
+        .irqn       = USART2_IRQn,
+        .type       = STM32_USART,
+        .clk_src    = 0, /* Use APB clock */
     },
     {
         .dev        = USART1,
@@ -95,23 +98,32 @@ static const uart_conf_t uart_config[] = {
         .rx_af      = GPIO_AF4,
         .tx_af      = GPIO_AF4,
         .bus        = APB2,
-        .irqn       = USART1_IRQn
+        .irqn       = USART1_IRQn,
+        .type       = STM32_USART,
+        .clk_src    = 0, /* Use APB clock */
     },
+#ifdef MODULE_PERIPH_LPUART
     {
-        .dev        = USART4,
-        .rcc_mask   = RCC_APB1ENR_USART4EN,
+        .dev        = LPUART1,
+        .rcc_mask   = RCC_APB1ENR_LPUART1EN,
         .rx_pin     = GPIO_PIN(PORT_C, 11),
         .tx_pin     = GPIO_PIN(PORT_C, 10),
-        .rx_af      = GPIO_AF6,
-        .tx_af      = GPIO_AF6,
+        .rx_af      = GPIO_AF0,
+        .tx_af      = GPIO_AF0,
         .bus        = APB1,
-        .irqn       = USART4_5_IRQn
+        .irqn       = LPUART1_IRQn,
+        .type       = STM32_LPUART,
+        .clk_src    = 0, /* Use APB clock */
     },
+#endif
 };
 
 #define UART_0_ISR          (isr_usart2)
 #define UART_1_ISR          (isr_usart1)
-#define UART_2_ISR          (isr_usart4_5)
+
+#ifdef MODULE_PERIPH_LPUART
+#define UART_2_ISR          (isr_rng_lpuart1)
+#endif
 
 #define UART_NUMOF          (sizeof(uart_config) / sizeof(uart_config[0]))
 /** @} */

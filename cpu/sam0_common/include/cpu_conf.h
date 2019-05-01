@@ -22,7 +22,11 @@
 #define CPU_CONF_H
 
 #include "cpu_conf_common.h"
+#if defined(CPU_SAML1X)
+#include "vendor/sam23.h"
+#else
 #include "vendor/sam0.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -35,6 +39,12 @@ extern "C" {
 #define CPU_DEFAULT_IRQ_PRIO            (1U)
 #define CPU_IRQ_NUMOF                   PERIPH_COUNT_IRQn
 #define CPU_FLASH_BASE                  FLASH_ADDR
+
+#ifdef CPU_SAML1X
+#define CPU_FLASH_RWWEE_BASE            DATAFLASH_ADDR
+#else
+#define CPU_FLASH_RWWEE_BASE            NVMCTRL_RWW_EEPROM_ADDR
+#endif
 /** @} */
 
 /**
@@ -43,14 +53,28 @@ extern "C" {
  */
 /* a flashpage in RIOT is mapped to a flash row on the SAM0s */
 #define FLASHPAGE_SIZE             (256U)
-/* one SAM0 row contains 4 SAM0 pages -> 4x the amount of RIOT flashpages */
-#define FLASHPAGE_NUMOF            (FLASH_NB_OF_PAGES / 4)
+/* one SAM0 row contains 4 SAM0 pages, so 4 SAM0 pages contain
+ * the amount of a RIOT flashpage
+ */
+#define FLASHPAGE_PAGES_PER_ROW    (4)
+/* number of RIOT flashpages on device */
+#define FLASHPAGE_NUMOF            (FLASH_NB_OF_PAGES / FLASHPAGE_PAGES_PER_ROW)
 /* The minimum block size which can be written is 16B. However, the erase
  * block is always FLASHPAGE_SIZE (SAM0 row).
  */
 #define FLASHPAGE_RAW_BLOCKSIZE    (16)
 /* Writing should be always 4 byte aligned */
 #define FLASHPAGE_RAW_ALIGNMENT    (4)
+/* Add RWWEE memory if supported by revision of the chip
+ * On some chips it is called RWW EEPROM while on some DATAFLASH, try to
+ * catch all without relying on the CPU model but on the named defines
+ */
+#ifdef NVMCTRL_RWW_EEPROM_SIZE
+#define FLASHPAGE_RWWEE_NUMOF      (NVMCTRL_RWWEE_PAGES / FLASHPAGE_PAGES_PER_ROW)
+#endif
+#ifdef DATAFLASH_SIZE
+#define FLASHPAGE_RWWEE_NUMOF      (DATAFLASH_NB_OF_PAGES / FLASHPAGE_PAGES_PER_ROW)
+#endif
 /** @} */
 
 #ifdef __cplusplus

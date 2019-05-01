@@ -28,16 +28,6 @@ extern "C" {
 #endif
 
 /**
- * @brief   Override the ADC resolution configuration
- * @{
- */
-#define HAVE_ADC_RES_T
-typedef enum {
-    ADC_RES_10BIT      /* only one resolution is supported */
-} adc_res_t;
-/** @} */
-
-/**
  * @brief   Length of the CPU_ID in octets
  */
 #define CPUID_LEN           (4U)
@@ -160,12 +150,12 @@ typedef enum {
 
 #endif /* MODULE_PERIPH_SPI */
 
+/** @} */
+
 /**
  * @brief   Prevent shared timer functions from being used
  */
 #define PERIPH_TIMER_PROVIDES_SET
-
-/** @} */
 
 #ifdef __cplusplus
 }

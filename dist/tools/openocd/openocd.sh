@@ -17,30 +17,33 @@
 #
 # The script supports the following actions:
 #
-# flash:        flash a given ELF file to the target.
+# flash:        flash <image_file>
+#               flash given file to the target.
 #
 #               options:
-#               IMAGE_FILE: Filename of the file that will be flashed
+#               <image_file>:   Filename of the file that will be flashed
 #               PRE_FLASH_CHECK_SCRIPT: a command to run before flashing to
-#               verify the integrity of the image to be flashed. ELFFILE is
+#               verify the integrity of the image to be flashed. <image_file> is
 #               passed as a command line argument to this command.
-#               Even though the file name variable is named ELFFILE, flashing
-#               works with any file format recognized by OpenOCD (elf, ihex, s19, bin).
 #
-# debug:        starts OpenOCD as GDB server in the background and
+#               Flashing works with any file format recognized by OpenOCD
+#               (elf, ihex, s19, bin).
+#
+# debug:        debug <elfile>
+#               starts OpenOCD as GDB server in the background and
 #               connects to the server with the GDB client specified by
 #               the board
 #
 #               options:
+#               <elffile>:      path to the file to debug, must be in a format
+#                               recognized by GDB (preferably ELF, it will not
+#                               work with .bin, .hex or .s19 because they lack
+#                               symbol information)
 #               GDB_PORT:       port opened for GDB connections
 #               TCL_PORT:       port opened for TCL connections
 #               TELNET_PORT:    port opened for telnet connections
 #               DBG:            debugger client command, default: 'gdb -q'
 #               TUI:            if TUI!=null, the -tui option will be used
-#               ELFFILE:        path to the file to debug, must be in a format
-#                               recognized by GDB (preferably ELF, it will not
-#                               work with .bin, .hex or .s19 because they lack
-#                               symbol information)
 #
 # debug-server: starts OpenOCD as GDB server, but does not connect to
 #               to it with any frontend. This might be useful when using
@@ -87,16 +90,14 @@
 # the target when starting a debug session. 'reset halt' can also be used
 # depending on the type of target.
 : ${OPENOCD_DBG_START_CMD:=-c 'halt'}
+# command used to reset the board
+: ${OPENOCD_CMD_RESET_RUN:="-c 'reset run'"}
 # This is an optional offset to the base address that can be used to flash an
 # image in a different location than it is linked at. This feature can be useful
 # when flashing images for firmware swapping/remapping boot loaders.
 # Default offset is 0, meaning the image will be flashed at the address that it
 # was linked at.
 : ${IMAGE_OFFSET:=0}
-# Image file used for flashing. Must be in a format that OpenOCD can handle (ELF,
-# Intel hex, S19, or raw binary)
-# Default is to use $ELFFILE
-: ${IMAGE_FILE:=${ELFFILE}}
 # Type of image, leave empty to let OpenOCD automatically detect the type from
 # the file (default).
 # Valid values: elf, hex, s19, bin (see OpenOCD manual for more information)
@@ -210,6 +211,7 @@ _flash_address() {
 # now comes the actual actions
 #
 do_flash() {
+    IMAGE_FILE=$1
     test_config
     test_imagefile
     if [ -n "${PRE_FLASH_CHECK_SCRIPT}" ]; then
@@ -256,6 +258,7 @@ do_flash() {
 }
 
 do_debug() {
+    ELFFILE=$1
     test_config
     test_elffile
     # temporary file that saves OpenOCD pid
@@ -322,7 +325,7 @@ do_reset() {
             -c 'telnet_port 0' \
             -c 'gdb_port 0' \
             -c 'init' \
-            -c 'reset run' \
+            ${OPENOCD_CMD_RESET_RUN} \
             -c 'shutdown'"
 }
 
@@ -330,15 +333,16 @@ do_reset() {
 # parameter dispatching
 #
 ACTION="$1"
+shift # pop $1 from $@
 
 case "${ACTION}" in
   flash)
     echo "### Flashing Target ###"
-    do_flash
+    do_flash "$@"
     ;;
   debug)
     echo "### Starting Debugging ###"
-    do_debug
+    do_debug "$@"
     ;;
   debug-server)
     echo "### Starting GDB Server ###"
@@ -350,6 +354,8 @@ case "${ACTION}" in
     ;;
   *)
     echo "Usage: $0 {flash|debug|debug-server|reset}"
+    echo "          flash <flashfile>"
+    echo "          debug <elffile>"
     exit 2
     ;;
 esac
