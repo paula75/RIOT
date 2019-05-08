@@ -30,6 +30,7 @@
 #include "timex.h"
 #include "utlist.h"
 #include "xtimer.h"
+#include "od.h"
 
 #define SERVER_MSG_QUEUE_SIZE   (8U)
 #define SERVER_PRIO             (THREAD_PRIORITY_MAIN - 1)
@@ -43,6 +44,7 @@ static msg_t server_queue[SERVER_MSG_QUEUE_SIZE];
 char addr_str[GNRC_NETIF_HDR_L2ADDR_PRINT_LEN];
 static kernel_pid_t server_pid = KERNEL_PID_UNDEF;
 static uint8_t send_count = 0;
+uint8_t *addr_ptr;
 
 static void *_eventloop(void *arg)
 {
@@ -50,25 +52,31 @@ static void *_eventloop(void *arg)
     msg_t msg, reply;
     unsigned int rcv_count = 0;
 
-    /* setup the message queue */
+    /* setup the message queue to rcv packets */
     msg_init_queue(server_queue, SERVER_MSG_QUEUE_SIZE);
 
     reply.content.value = (uint32_t)(-ENOTSUP);
     reply.type = GNRC_NETAPI_MSG_TYPE_ACK;
-    uint8_t *src_add;
-    uint8_t src_add_len;
 
     while (1) {
         msg_receive(&msg);
+        gnrc_pktsnip_t *pkt = NULL;
 
         switch (msg.type) {
             case GNRC_NETAPI_MSG_TYPE_RCV:
-                printf("Packets received: %u\n", ++rcv_count);
-                /* Extract the source address out of a gnrc packet */
-                src_add_len = gnrc_netif_hdr_get_srcaddr(msg.content.ptr, &src_add);
-                printf("DEBUG: address: %s\n", gnrc_netif_addr_to_str(src_add, src_add_len , addr_str));
 
-                gnrc_pktbuf_release(msg.content.ptr);
+                pkt = (gnrc_pktsnip_t *)msg.content.ptr;
+                printf("GNRC_NETTYPE_UDP (%i)\n", pkt->type);
+                printf("Packets received: %u\n", ++rcv_count);
+                // gnrc_netif_hdr_get_srcaddr(pkt, &addr_ptr);
+                // gnrc_netif_ipv6_iid_from_addr(const gnrc_netif_t *netif,
+                //                                   add_ptr, sizeof(add_ptr),
+                //                                   eui64_t *iid);
+
+                // xtimer_usleep(WAIT_PERIOD);
+                // send()
+                od_hex_dump(pkt->data, pkt->size, OD_WIDTH_DEFAULT);
+                gnrc_pktbuf_release(pkt);
                 break;
             case GNRC_NETAPI_MSG_TYPE_GET:
             case GNRC_NETAPI_MSG_TYPE_SET:
@@ -162,7 +170,7 @@ static void send(char *addr_str, char *port_str, char *data_len_str, unsigned in
     }
 }
 
-static void start_server(char *port_str)
+void start_server(char *port_str)
 {
     uint16_t port;
 
@@ -219,7 +227,7 @@ int udp_cmd(int argc, char **argv)
 
     if (strcmp(argv[1], "send") == 0) {
         uint32_t num = 1;
-        uint32_t delay = 1000000LU;
+        uint32_t delay = 1000000;
         if (argc < 5) {
             printf("usage: %s send <addr> <port> <bytes> [<num> [<delay in us>]]\n",
                    argv[0]);

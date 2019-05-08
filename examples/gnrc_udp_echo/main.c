@@ -20,8 +20,10 @@
 #include <stdio.h>
 #include "shell.h"
 
-
 extern int udp_cmd(int argc, char **argv);
+extern void start_server(char *port_str);
+
+char udp_port[10];
 
 const shell_command_t shell_commands[] = {
    { "udp", "send data over UDP and listen on UDP ports", udp_cmd },
@@ -30,7 +32,10 @@ const shell_command_t shell_commands[] = {
 
 int main(void)
 {
-    // msg_init_queue(_main_msg_queue, MAIN_QUEUE_SIZE);
+
+    sprintf(udp_port,"%d" ,UDP_PORT);
+    printf("Start server on port %s\n", udp_port);
+    start_server(udp_port);
 
     char line_buf[SHELL_DEFAULT_BUFSIZE];
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);

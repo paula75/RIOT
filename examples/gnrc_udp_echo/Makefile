@@ -32,10 +32,13 @@ USEMODULE += gnrc_icmpv6_echo
 USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ps
+USEMODULE += od
+# Use for ascii representation
+USEMODULE += od_string
 
 # We use only the lower layers of the GNRC network stack, hence, we can
 # reduce the size of the packet buffer a bit
 CFLAGS += -DGNRC_PKTBUF_SIZE=512
-
-
+# Define UDP port
+CFLAGS += -DUDP_PORT=8808
 include $(RIOTBASE)/Makefile.include
