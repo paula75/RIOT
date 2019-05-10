@@ -38,8 +38,8 @@ Now you can send a message to the first RIOT instance:
 
 In your first terminal, you should now see
 
-   > Received message: testmessage
-      Reply sent
+    > Received message: testmessage
+        Reply sent
 
 Then, the first instances replies to this message to the second, you can add the od_string module in the gnrc_networking Makefile to see the string representation, So in the second RIOT instance you should see:
     > PKTDUMP: data received:
