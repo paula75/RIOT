@@ -42,23 +42,23 @@ In your first terminal, you should now see
         Reply sent
 
 Then, the first instances replies to this message to the second, you can add the od_string module in the gnrc_networking Makefile to see the string representation, So in the second RIOT instance you should see:
-    > PKTDUMP: data received:
-    ~~ SNIP  0 - size:  11 byte, type: NETTYPE_UNDEF (0)
-    00000000  74  65  73  74  6D  65  73  73  61  67  65                      testmessage
-    ~~ SNIP  1 - size:   8 byte, type: NETTYPE_UDP (3)
-       src-port:  8888  dst-port:  8888
-       length: 19  cksum: 0x3b88
-    ~~ SNIP  2 - size:  40 byte, type: NETTYPE_IPV6 (1)
-    traffic class: 0x00 (ECN: 0x0, DSCP: 0x00)
-    flow label: 0x00000
-    length: 19  next header: 17  hop limit: 64
-    source address: fe80::5059:aeff:fe9b:957a
-    destination address: fe80::e847:82ff:feac:f54f
-    ~~ SNIP  3 - size:  20 byte, type: NETTYPE_NETIF (-1)
-    if_pid: 6  rssi: 0  lqi: 0
-    flags: 0x0
-    src_l2addr: 52:59:AE:9B:95:7A
-    dst_l2addr: EA:47:82:AC:F5:4F
-    ~~ PKT    -  4 snips, total size:  79 byte
+      > PKTDUMP: data received:
+      ~~ SNIP  0 - size:  11 byte, type: NETTYPE_UNDEF (0)
+      00000000  74  65  73  74  6D  65  73  73  61  67  65                      testmessage
+      ~~ SNIP  1 - size:   8 byte, type: NETTYPE_UDP (3)
+         src-port:  8888  dst-port:  8888
+         length: 19  cksum: 0x3b88
+      ~~ SNIP  2 - size:  40 byte, type: NETTYPE_IPV6 (1)
+      traffic class: 0x00 (ECN: 0x0, DSCP: 0x00)
+      flow label: 0x00000
+      length: 19  next header: 17  hop limit: 64
+      source address: fe80::5059:aeff:fe9b:957a
+      destination address: fe80::e847:82ff:feac:f54f
+      ~~ SNIP  3 - size:  20 byte, type: NETTYPE_NETIF (-1)
+      if_pid: 6  rssi: 0  lqi: 0
+      flags: 0x0
+      src_l2addr: 52:59:AE:9B:95:7A
+      dst_l2addr: EA:47:82:AC:F5:4F
+      ~~ PKT    -  4 snips, total size:  79 byte
 
 You can change the server port and the delay(in seconds) of the reply in the Makefile
