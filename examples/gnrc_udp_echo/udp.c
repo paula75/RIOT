@@ -23,85 +23,57 @@
 #include "msg.h"
 #include "net/gnrc.h"
 #include "net/gnrc/ipv6.h"
+#include "net/gnrc/udp.h"
 #include "net/gnrc/netif.h"
 #include "net/gnrc/netif/hdr.h"
-#include "net/gnrc/udp.h"
+#include "net/sock/udp.h"
 #include "net/gnrc/pktdump.h"
-#include "timex.h"
-#include "utlist.h"
+#include "thread.h"
 #include "xtimer.h"
-#include "od.h"
 
 #define SERVER_MSG_QUEUE_SIZE   (8U)
-#define SERVER_PRIO             (THREAD_PRIORITY_MAIN - 1)
-#define SERVER_STACKSIZE        (THREAD_STACKSIZE_MAIN)
-#define SERVER_RESET            (0x8fae)
+#define SERVER_BUFFER_SIZE      (32)
 
-static gnrc_netreg_entry_t server = GNRC_NETREG_ENTRY_INIT_PID(GNRC_NETREG_DEMUX_CTX_ALL, KERNEL_PID_UNDEF);
+static char server_stack[THREAD_STACKSIZE_DEFAULT];
+uint8_t buf[128];
+sock_udp_t sock;
+sock_udp_ep_t local = SOCK_IPV6_EP_ANY;
 
-static char server_stack[SERVER_STACKSIZE];
-static msg_t server_queue[SERVER_MSG_QUEUE_SIZE];
-char addr_str[GNRC_NETIF_HDR_L2ADDR_PRINT_LEN];
-static kernel_pid_t server_pid = KERNEL_PID_UNDEF;
-static uint8_t send_count = 0;
-uint8_t *addr_ptr;
-
-static void *_eventloop(void *arg)
+static void *_server_thread(void *arg)
 {
     (void)arg;
-    msg_t msg, reply;
-    unsigned int rcv_count = 0;
-
-    /* setup the message queue to rcv packets */
-    msg_init_queue(server_queue, SERVER_MSG_QUEUE_SIZE);
-
-    reply.content.value = (uint32_t)(-ENOTSUP);
-    reply.type = GNRC_NETAPI_MSG_TYPE_ACK;
 
     while (1) {
-        msg_receive(&msg);
-        gnrc_pktsnip_t *pkt = NULL;
 
-        switch (msg.type) {
-            case GNRC_NETAPI_MSG_TYPE_RCV:
+        sock_udp_ep_t remote;
+        ssize_t res;
 
-                pkt = (gnrc_pktsnip_t *)msg.content.ptr;
-                printf("GNRC_NETTYPE_UDP (%i)\n", pkt->type);
-                printf("Packets received: %u\n", ++rcv_count);
-                // gnrc_netif_hdr_get_srcaddr(pkt, &addr_ptr);
-                // gnrc_netif_ipv6_iid_from_addr(const gnrc_netif_t *netif,
-                //                                   add_ptr, sizeof(add_ptr),
-                //                                   eui64_t *iid);
+        if ((res = sock_udp_recv(&sock, buf, sizeof(buf), SOCK_NO_TIMEOUT,
+                                 &remote)) >= 0) {
+            printf("Received message: ");
+            for(int i = 0; i < res; i++ ){
+              printf("%c", buf[i]);
+            }
+            printf("\n");
 
-                // xtimer_usleep(WAIT_PERIOD);
-                // send()
-                od_hex_dump(pkt->data, pkt->size, OD_WIDTH_DEFAULT);
-                gnrc_pktbuf_release(pkt);
-                break;
-            case GNRC_NETAPI_MSG_TYPE_GET:
-            case GNRC_NETAPI_MSG_TYPE_SET:
-                msg_reply(&msg, &reply);
-                break;
-            case SERVER_RESET:
-                rcv_count = 0;
-                break;
-            default:
-                break;
+            /* Form reply */
+            if (sock_udp_send(&sock, buf, res, &remote) < 0) {
+                puts("Error sending reply");
+            }
+            else{
+              puts("Reply sent");
+            }
         }
     }
-
-    /* never reached */
     return NULL;
 }
 
-static void send(char *addr_str, char *port_str, char *data_len_str, unsigned int num,
+static void send(char *addr_str, char *port_str, char *data, unsigned int num,
                  unsigned int delay)
 {
     int iface;
-    char *conversion_end;
     uint16_t port;
     ipv6_addr_t addr;
-    size_t data_len;
 
     /* get interface, if available */
     iface = ipv6_addr_split_iface(addr_str);
@@ -120,21 +92,17 @@ static void send(char *addr_str, char *port_str, char *data_len_str, unsigned in
         return;
     }
 
-    data_len = strtoul(data_len_str, &conversion_end, 0);
-    if (*conversion_end != '\0') {
-        puts("Error: unable to parse data_len");
-        return;
-    }
-
     for (unsigned int i = 0; i < num; i++) {
         gnrc_pktsnip_t *payload, *udp, *ip;
+        unsigned payload_size;
         /* allocate payload */
-        payload = gnrc_pktbuf_add(NULL, NULL, data_len, GNRC_NETTYPE_UNDEF);
+        payload = gnrc_pktbuf_add(NULL, data, strlen(data), GNRC_NETTYPE_UNDEF);
         if (payload == NULL) {
             puts("Error: unable to copy data to packet buffer");
             return;
         }
-        memset(payload->data, send_count++, data_len);
+        /* store size for output */
+        payload_size = (unsigned)payload->size;
         /* allocate UDP header, set source port := destination port */
         udp = gnrc_udp_hdr_build(payload, port, port);
         if (udp == NULL) {
@@ -163,65 +131,40 @@ static void send(char *addr_str, char *port_str, char *data_len_str, unsigned in
             return;
         }
         /* access to `payload` was implicitly given up with the send operation above
-         * => use original variable for output */
-        printf("Success: send %u byte to [%s]:%u\n", (unsigned)data_len, addr_str,
+         * => use temporary variable for output */
+        printf("Success: sent %u byte(s) to [%s]:%u\n", payload_size, addr_str,
                port);
         xtimer_usleep(delay);
     }
 }
 
-void start_server(char *port_str)
+int udp_start_server(int udp_echo_port)
 {
-    uint16_t port;
+    local.port = udp_echo_port;
 
-    /* check if server is already running */
-    if (server.target.pid != KERNEL_PID_UNDEF) {
-        printf("Error: server already running on port %" PRIu32 "\n",
-               server.demux_ctx);
-        return;
+    /* Create new UDP socket object*/
+    if (sock_udp_create(&sock, &local, NULL, 0) < 0) {
+        puts("Error creating UDP sock");
+        return -1;
     }
-    /* parse port */
-    port = atoi(port_str);
-    if (port == 0) {
-        puts("Error: invalid port specified");
-        return;
+    /* start server (which means registering pktdump for the chosen port) */
+    if (thread_create(server_stack, sizeof(server_stack), THREAD_PRIORITY_MAIN - 1,
+                      THREAD_CREATE_STACKTEST,
+                      _server_thread, NULL, "UDP server") <= KERNEL_PID_UNDEF)
+    {
+        puts("error initializing server thread");
+        return -1;
     }
-    if (server_pid <= KERNEL_PID_UNDEF) {
-        /* start server */
-        server_pid = thread_create(server_stack, sizeof(server_stack), SERVER_PRIO,
-                                   THREAD_CREATE_STACKTEST, _eventloop, NULL, "UDP server");
-        if (server_pid <= KERNEL_PID_UNDEF) {
-            puts("Error: can not start server thread");
-            return;
-        }
-    }
-    /* register server to receive messages from given port */
-    server.target.pid = gnrc_pktdump_pid;
-    gnrc_netreg_entry_init_pid(&server, port, server_pid);
-    gnrc_netreg_register(GNRC_NETTYPE_UDP, &server);
-    printf("Success: started UDP server on port %" PRIu16 "\n", port);
+    printf("UDP sock created on port: %i\n", udp_echo_port);
+
+    return 1;
 }
 
-static void stop_server(void)
-{
-    msg_t msg = { .type = SERVER_RESET };
-    /* check if server is running at all */
-    if (server.target.pid == KERNEL_PID_UNDEF) {
-        printf("Error: server was not running\n");
-        return;
-    }
-    /* reset server state */
-    msg_send(&msg, server.target.pid);
-    /* stop server */
-    gnrc_netreg_unregister(GNRC_NETTYPE_UDP, &server);
-    gnrc_netreg_entry_init_pid(&server, 0, KERNEL_PID_UNDEF);
-    puts("Success: stopped UDP server");
-}
 
 int udp_cmd(int argc, char **argv)
 {
     if (argc < 2) {
-        printf("usage: %s [send|server|reset]\n", argv[0]);
+        printf("usage: %s [send]\n", argv[0]);
         return 1;
     }
 
@@ -240,25 +183,6 @@ int udp_cmd(int argc, char **argv)
             delay = atoi(argv[6]);
         }
         send(argv[2], argv[3], argv[4], num, delay);
-    }
-    else if (strcmp(argv[1], "server") == 0) {
-        if (argc < 3) {
-            printf("usage: %s server [start|stop]\n", argv[0]);
-            return 1;
-        }
-        if (strcmp(argv[2], "start") == 0) {
-            if (argc < 4) {
-                printf("usage %s server start <port>\n", argv[0]);
-                return 1;
-            }
-            start_server(argv[3]);
-        }
-        else if (strcmp(argv[2], "stop") == 0) {
-            stop_server();
-        }
-        else {
-            puts("error: invalid command");
-        }
     }
     else {
         puts("error: invalid command");
