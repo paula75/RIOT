@@ -33,6 +33,7 @@ USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ps
 USEMODULE += fmt
+USEMODULE += xtimer
 USEMODULE += gnrc_sock_udp
 
 # We use only the lower layers of the GNRC network stack, hence, we can
@@ -41,8 +42,8 @@ CFLAGS += -DGNRC_PKTBUF_SIZE=512
 # # Define UDP port
 DUDP_ECHO_DEFAULT_PORT ?= 8888
 CFLAGS += -DUDP_ECHO_PORT=$(DUDP_ECHO_DEFAULT_PORT)
-# # Define UDP echo delay in ms
-DUDP_ECHO_DEFAULT_DELAY ?= 0
+# # Define UDP echo delay in seg
+DUDP_ECHO_DEFAULT_DELAY ?= 1
 CFLAGS += -DUDP_ECHO_DELAY=$(DUDP_ECHO_DEFAULT_DELAY)
 
 include $(RIOTBASE)/Makefile.include

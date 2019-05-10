@@ -39,9 +39,10 @@ uint8_t buf[128];
 sock_udp_t sock;
 sock_udp_ep_t local = SOCK_IPV6_EP_ANY;
 
-static void *_server_thread(void *arg)
+static void *_server_thread(void *args)
 {
-    (void)arg;
+    int delay;
+    delay = (int) args;
 
     while (1) {
 
@@ -56,12 +57,13 @@ static void *_server_thread(void *arg)
             }
             printf("\n");
 
+            xtimer_sleep(delay);
             /* Form reply */
             if (sock_udp_send(&sock, buf, res, &remote) < 0) {
                 puts("Error sending reply");
             }
             else{
-              puts("Reply sent");
+              printf("Reply sent after %i seconds\n", delay);
             }
         }
     }
@@ -138,7 +140,7 @@ static void send(char *addr_str, char *port_str, char *data, unsigned int num,
     }
 }
 
-int udp_start_server(int udp_echo_port)
+int udp_start_server(int udp_echo_port, int *delay)
 {
     local.port = udp_echo_port;
 
@@ -150,7 +152,7 @@ int udp_start_server(int udp_echo_port)
     /* start server (which means registering pktdump for the chosen port) */
     if (thread_create(server_stack, sizeof(server_stack), THREAD_PRIORITY_MAIN - 1,
                       THREAD_CREATE_STACKTEST,
-                      _server_thread, NULL, "UDP server") <= KERNEL_PID_UNDEF)
+                      _server_thread, delay, "UDP server") <= KERNEL_PID_UNDEF)
     {
         puts("error initializing server thread");
         return -1;

@@ -30,7 +30,7 @@ In a second terminal, compile [gnrc_networking example](https://github.com/RIOT-
 
 In the RIOT shell on `tap1`, you can start a udp server on the same port:
 
-> udp server start 8808
+    > udp server start 8808
 
 Now you can send a message to the first RIOT instance:
 
@@ -60,3 +60,5 @@ Then, the first instances replies to this message to the second, you can add the
     src_l2addr: 52:59:AE:9B:95:7A
     dst_l2addr: EA:47:82:AC:F5:4F
     ~~ PKT    -  4 snips, total size:  79 byte
+
+You can change the server port and the delay(in seconds) of the reply in the Makefile
